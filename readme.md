@@ -5,6 +5,7 @@ Following result was produced on
 - Linux 3bf76b2c8e56 5.4.72-microsoft-standard-WSL2 #1 SMP Wed Oct 28 23:40:43 UTC 2020 x86_64 GNU/Linux
 - cargo 1.66.0-nightly (b332991a5 2022-10-13)
 - rustc 1.66.0-nightly (06f049a35 2022-10-17)
+
 Compiled and ran with cargo run --release
 
 
