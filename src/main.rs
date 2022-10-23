@@ -33,45 +33,96 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for CountAlloc<A> {
     }
 }
 
-impl<A: GlobalAlloc> CountAlloc<A> {
-    pub unsafe fn show(&self, s: &str) {
-        println!("{s}\t: {RAM_COUNT}");
+fn main() {
+    for i in (0..16).step_by(2) {
+        let n = 2i64.pow(i);
+        calculate(n);
     }
 }
 
-fn main() {
-    unsafe {
-        ALLOC.show("without collections");
-        let a = hashmap::<EmptyStruct>();
-        ALLOC.show("hashmap with EmptyStruct");
+#[derive(serde::Serialize)]
+struct Log {
+    entry_count: i64,
+    value_type: &'static str,
+    collection: &'static str,
+    capacity: Option<usize>,
+    ram_usage: usize,
+    shrink_type: ShrinkType
+}
+
+#[derive(serde::Serialize, Clone, Copy)]
+enum ShrinkType {
+    AfterShrink,
+    BeforeShrink,
+    None
+}
+
+macro_rules! this {
+    ($i:ident, $func:ident) => {
+        this!($i, $func, EmptyStruct);
+        this!($i, $func, BigStruct);
+    };
+    (@ linked_list $_:ident) => {
+        None
+    };
+    (@ btreemap $_:ident) => {
+        None
+    };
+    (@ nothing $_:ident) => {
+        None
+    };
+    (@ $_:ident $cap:ident) => {
+        Some($cap.capacity())
+    };
+    (@ shrink vector $a:ident $t:ident) => {
+        $a.shrink_to_fit();
+        $t = ShrinkType::AfterShrink;
+    };
+    (@ shrink vector_deque $a:ident $t:ident) => {
+        $a.shrink_to_fit();
+        $t = ShrinkType::AfterShrink;
+    };
+    (@ shrink hashmap $a:ident $t:ident) => {
+        $a.shrink_to_fit();
+        $t = ShrinkType::AfterShrink;
+    };
+    (@ shrink $_:ident $__:ident $t:ident) => {
+        $t = ShrinkType::None;
+    };
+    ($i:ident, $func:ident, $gen:ident) => {
+        #[allow(unused_mut)]
+        let mut a = $func::<$gen>($i);
+        let capacity = this!(@ $func a);
+        let f = |shrink_type, capacity| Log {
+            entry_count: $i,
+            value_type: stringify!($gen),
+            collection: stringify!($func),
+            capacity,
+            ram_usage: RAM_COUNT,
+            shrink_type
+        };
+        
+        let mut shrink_type = ShrinkType::BeforeShrink;
+        let s = serde_json::to_string(&f(shrink_type, capacity)).unwrap();
+        println!("{s}");
+        drop(s);
+        this!(@ shrink $func a shrink_type);
+        let capacity = this!(@ $func a);
+        let s = serde_json::to_string(&f(shrink_type, capacity)).unwrap();
+        println!("{s}");
         drop(a);
-        let b = hashmap::<BigStruct>();
-        ALLOC.show("hashmap with BigStruct");
-        drop(b);
-        let c = btreemap::<EmptyStruct>();
-        ALLOC.show("btreemap with EmptyStruct");
-        drop(c);
-        let d = btreemap::<BigStruct>();
-        ALLOC.show("btreemap with BigStruct");
-        drop(d);
-        let e = vector::<EmptyStruct>();
-        ALLOC.show("vector with EmptyStruct");
-        drop(e);
-        let f = vector::<BigStruct>();
-        ALLOC.show("vector with BigStruct");
-        drop(f);
-        let f = vector_deque::<EmptyStruct>();
-        ALLOC.show("vector deque with EmptyStruct");
-        drop(f);
-        let f = vector_deque::<BigStruct>();
-        ALLOC.show("vector deque with BigStruct");
-        drop(f);
-        let f = linked_list::<EmptyStruct>();
-        ALLOC.show("linked list with EmptyStruct");
-        drop(f);
-        let f = linked_list::<BigStruct>();
-        ALLOC.show("linked list with BigStruct");
-        drop(f);
+        drop(s);
+    };
+}
+
+fn calculate(i: i64) {
+    unsafe {
+        this!(i, nothing);
+        this!(i, hashmap);
+        this!(i, btreemap);
+        this!(i, vector);
+        this!(i, vector_deque);
+        this!(i, linked_list);
     }
 }
 
@@ -111,43 +162,49 @@ struct BigStruct {
 
 
 type Key = i64;
-fn btreemap<T: Default>() -> BTreeMap<Key,T> {
+
+struct Nothing;
+fn nothing<T: Default>(_: i64) -> Nothing {
+    Nothing
+}
+
+fn btreemap<T: Default>(a: i64) -> BTreeMap<Key,T> {
     let mut map = BTreeMap::new();
-    for i in 0..1_000_000 {
+    for i in 0..a {
         map.insert(i, T::default());
     }
     map
 }
 
-fn hashmap<T: Default>() -> HashMap<Key,T>{
+fn hashmap<T: Default>(a: i64) -> HashMap<Key,T>{
     let mut map = HashMap::new();
-    for i in 0..1_000_000 {
+    for i in 0..a {
         map.insert(i, T::default());
     }
     map
 }
 
-fn vector<T: Default>() -> Vec<(Key,T)> {
+fn vector<T: Default>(a: i64) -> Vec<(Key,T)> {
     let mut stack = vec![];
-    for i in 0..1_000_000 {
+    for i in 0..a {
         stack.push((i, T::default()));
     }
     stack
 }
 
 
-fn vector_deque<T: Default>() -> VecDeque<(Key,T)> {
+fn vector_deque<T: Default>(a: i64) -> VecDeque<(Key,T)> {
     let mut stack = VecDeque::new();
-    for i in 0..1_000_000 {
+    for i in 0..a {
         stack.push_back((i, T::default()));
     }
     stack
 }
 
 
-fn linked_list<T: Default>() -> LinkedList<(Key,T)> {
+fn linked_list<T: Default>(a: i64) -> LinkedList<(Key,T)> {
     let mut stack = LinkedList::new();
-    for i in 0..1_000_000 {
+    for i in 0..a {
         stack.push_back((i, T::default()));
     }
     stack
