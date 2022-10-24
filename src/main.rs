@@ -34,8 +34,8 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for CountAlloc<A> {
 }
 
 fn main() {
-    for i in (0..16).step_by(2) {
-        let n = 2i64.pow(i);
+    for i in 0..128i64 {
+        let n = i.pow(2);
         calculate(n);
     }
 }
@@ -57,10 +57,12 @@ enum ShrinkType {
     None
 }
 
+type BoxedBigStruct = Box<BigStruct>;
 macro_rules! this {
     ($i:ident, $func:ident) => {
         this!($i, $func, EmptyStruct);
         this!($i, $func, BigStruct);
+        this!($i, $func, BoxedBigStruct);
     };
     (@ linked_list $_:ident) => {
         None
